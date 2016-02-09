@@ -210,7 +210,7 @@ function sheet_to_csv(sheet, opts) {
     }
     var titleList = [];
     for (R = r.s.r ; R <r.s.r + 1; ++R) {
-         
+
     }
     for (R = r.s.r + 1; R <= r.e.r; ++R) {
         row1 = "";
@@ -221,7 +221,7 @@ function sheet_to_csv(sheet, opts) {
             txt = val !== undefined ? '' + format_cell(val) : "";
 
             row1 += (C === r.s.c ? "" : FS) + txt;
-            row[](row);
+             
         }
         out += row1 + RS;
     }
