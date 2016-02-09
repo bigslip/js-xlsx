@@ -210,7 +210,7 @@ function sheet_to_csv(sheet, opts) {
     }
     var titleList = [];
     for (R = r.s.r ; R <r.s.r + 1; ++R) {
-        titleList
+         
     }
     for (R = r.s.r + 1; R <= r.e.r; ++R) {
         row1 = "";
