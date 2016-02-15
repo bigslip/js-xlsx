@@ -26,6 +26,23 @@ var XW = {
     noxfer: './xlsxworker.js'
 };
 var SHEET_NAMES = ["survey", "choices", "settings"];
+
+var SURVEY_SHEET_COLUMNS = ["type",
+    "name",
+    "label",
+    "hint",
+    "constraint",
+    "constraintMessage",
+    "required",
+    "appearance",
+    "default",
+    "relevant",
+    "readOnly",
+    "calculation",
+    "image",
+    "audio"];
+var CHOICES_SHEET_COLUMNS = ["name", "label", "image"];
+
 var app = {
     // Application Constructor
     initialize: function () {
@@ -173,7 +190,7 @@ function process_wb(wb) {
     }
 
 
-    output = to_csv(wb);
+    output = process_sheets(wb);
 
     if (out.innerText === undefined) out.textContent = output;
     else out.innerText = output;
@@ -182,20 +199,22 @@ function process_wb(wb) {
         console.log("output", new Date());
 }
 
-function to_csv(workbook) {
+function process_sheets(workbook) {
     var result = [];
-    workbook.SheetNames.forEach(function (sheetName) {
-        var csv = X.utils.sheet_to_csv(workbook.Sheets[sheetName]);
-        if (csv.length > 0) {
-            result.push("SHEET: " + sheetName);
-            result.push("");
-            result.push(csv);
-        }
-    });
+    /*    workbook.SheetNames.forEach(function (sheetName) {
+     var csv = sheet_to_csv(workbook.Sheets[sheetName]);
+     if (csv.length > 0) {
+     result.push("SHEET: " + sheetName);
+     result.push("");
+     result.push(csv);
+     }
+     });*/
+    process_choices(workbook.Sheets["choices"]);
+    process_survey(workbook.Sheets['survey']);
     return result.join("\n");
 }
 
-function sheet_to_csv(sheet, opts) {
+function process_choices(sheet, opts) {
     var out = "", txt = "", qreg = /"/g;
 
     if (sheet == null || sheet["!ref"] == null) return "";
@@ -208,24 +227,85 @@ function sheet_to_csv(sheet, opts) {
     for (C = r.s.c; C <= r.e.c; ++C) {
         cols[C] = X.utils.encode_col(C);
     }
-    var titleList = [];
-    for (R = r.s.r ; R <r.s.r + 1; ++R) {
+    var lastListName = '';
+    var items = [];
+    for (R = r.s.r + 1; R <= r.e.r; ++R) {
+
+        var choiceItem = new ChoiceItem();
+        rr = X.utils.encode_row(R);
+        for (C = r.s.c; C <= r.e.c; ++C) {
+            val = sheet[cols[C] + rr];
+            //txt = val !== undefined ? '' + format_cell(val) : "";
+            if (C == 0 && val != undefined) {// if is first column means list name.
+                lastListName = val.v;
+            } else {
+                if (val !== undefined) {
+                    var s = 'set' + capitalizeFirstLetter(CHOICES_SHEET_COLUMNS[C - 1]);
+                    choiceItem[s](val.v);
+                } else {
+                    if (C == 0) {
+                        var choice = new Choice();
+                        choice.setListName(lastListName);
+                        choice.setItems(items);
+                        choiceList.push(choice);
+                        var items = [];
+                        break;
+                    }
+                    console.log('next one...');
+                }
+            }
+
+
+        }
+        if (choiceItem.name != undefined)
+            items.push(choiceItem);
 
     }
-    for (R = r.s.r + 1; R <= r.e.r; ++R) {
+    return out;
+}
+function process_survey(sheet, opts) {
+    var out = "", txt = "", qreg = /"/g;
+
+    if (sheet == null || sheet["!ref"] == null) return "";
+    var r = X.utils.decode_range(sheet["!ref"])
+    var FS = ",";
+    var RS = "\n";
+    var row = "", rr = "", cols = [];
+    var i = 0, cc = 0, val;
+    var R = 0, C = 0;
+    for (C = r.s.c; C <= r.e.c; ++C) {
+        cols[C] = X.utils.encode_col(C);
+    }
+
+    for (R = r.s.r; R <= r.e.r; ++R) {
         row1 = "";
         row = new Row();
         rr = X.utils.encode_row(R);
         for (C = r.s.c; C <= r.e.c; ++C) {
             val = sheet[cols[C] + rr];
-            txt = val !== undefined ? '' + format_cell(val) : "";
+            //txt = val !== undefined ? '' + format_cell(val) : "";
 
-            row1 += (C === r.s.c ? "" : FS) + txt;
-             
+            var s = 'set' + capitalizeFirstLetter(SURVEY_SHEET_COLUMNS[C]);
+            if (val !== undefined) {
+                row[s](val.v);
+            } else {
+                if (C == 0) {
+                    break;
+                }
+                console.log('hoy');
+            }
+            //row1 += (C === r.s.c ? "" : FS) + txt;
+
         }
         out += row1 + RS;
+        if (row.type != undefined)
+            rowList.push(row);
     }
     return out;
+}
+
+function capitalizeFirstLetter(string) {
+    return string[0].toUpperCase() + string.slice(1);
 }
 
 
@@ -236,17 +316,18 @@ function sheet_to_csv(sheet, opts) {
  **********/
 
 var rowList = [];
+var choiceList = [];
 
 function Row() {
 }
 Row.prototype = {
     constructor: Row,
 
-    setName: function (name) {
-        this.name = name;
-    },
     setType: function (type) {
         this.type = type;
+    },
+    setName: function (name) {
+        this.name = name;
     },
     setLabel: function (label) {
         this.label = label;
@@ -263,12 +344,66 @@ Row.prototype = {
     setRequired: function (required) {
         this.required = required;
     },
+    setAppearance: function (appearance) {
+        this.appearance = appearance;
+    },
     setDefault: function (_default) {
         this._default = _default;
     },
     setRelevant: function (relevant) {
         this.relevant = relevant;
+    },
+    setReadOnly: function (readOnly) {
+        this.readOnly = readOnly;
+    },
+    setCalculation: function (calculation) {
+        this.calculation = calculation;
+    },
+    setImage: function (image) {
+        this.image = image;
+    },
+    setAudio: function (audio) {
+        this.audio = audio;
+    },
+    setChoice: function (choice) {
+        this.choice = choice;
     }
+};
+
+
+function Choice() {
+    this.items = [];
 }
+Choice.prototype = {
+    constructor: Choice,
+
+    setListName: function (listName) {
+        this.listName = listName;
+    },
+
+    setItems: function (items) {
+        this.items = items;
+    },
+
+    addItem: function (item) {
+        this.items.push(item);
+    }
+};
+function ChoiceItem() {
+
+}
+ChoiceItem.prototype = {
+    constructor: ChoiceItem,
+
+    setName: function (name) {
+        this.name = name;
+    },
+    setLabel: function (label) {
+        this.label = label;
+    },
+    setImage: function (image) {
+        this.image = image;
+    }
+};
 
 app.initialize();
